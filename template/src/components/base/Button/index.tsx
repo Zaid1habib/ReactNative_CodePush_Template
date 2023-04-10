@@ -101,15 +101,15 @@ const Button = (props: ButtonProps) => {
         ...(shadow ? styles.shadowStyle : {}),
         ...styleProp,
       })}>
-      {loading && (
+      {loading ? (
         <View style={styles.loading}>
           <ActivityIndicator color={txtColor} />
         </View>
-      )}
-      <Text style={[styles.label, { color: txtColor }, titleStyle]}>
-        {title}
-      </Text>
-
+      ) :
+        <Text style={[styles.label, { color: txtColor }, titleStyle]}>
+          {title}
+        </Text>
+      }
       {!!right && right}
     </Pressable>
   );

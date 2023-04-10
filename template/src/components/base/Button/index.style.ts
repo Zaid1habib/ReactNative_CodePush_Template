@@ -18,8 +18,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   loading: {
-    marginRight: 15,
-    marginLeft: -35,
+    // marginRight: 15,
+    // marginLeft: -35,
   },
   shadowStyle: {
     shadowColor: '#000',

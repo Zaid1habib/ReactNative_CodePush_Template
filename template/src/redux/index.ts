@@ -19,10 +19,12 @@ import {
 import { IS_DEV } from '../utils/constants';
 import theme from './reducers/theme';
 import user from './reducers/user';
+import userProfileSlice  from './reducers/userDataSlice'; 
 
 const reducers = combineReducers({
   user,
   theme,
+  userProfileSlice,
 });
 
 const persistConfig = {

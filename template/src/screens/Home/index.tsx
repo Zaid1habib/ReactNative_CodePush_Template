@@ -1,104 +1,151 @@
-import React, { useState } from 'react';
-import RNRestart from 'react-native-restart'; // Import package from node modules
-import { View, I18nManager } from 'react-native';
-import { useTranslation } from 'react-i18next';
-import Button from '../../components/base/Button';
-import Divider from '../../components/base/Divider';
-import IconButton from '../../components/base/IconButton';
+import React, { Dispatch, useState } from 'react';
+import { View, Image, FlatList, ScrollView, TouchableOpacity } from 'react-native';
 import Text from '../../components/base/Text';
-import TextInput from '../../components/base/TextInput';
-import Container from '../../components/common/Container';
 import styles from './index.styles';
-import { devLog } from '../../utils/helpers';
-import useTheme from '../../hooks/useTheme';
-import showMessage from '../../configs/showMessage';
-import ENVIRONMENTS from '../../configs/environments';
+import { useDispatch, useSelector } from 'react-redux';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import TextInput from '../../components/base/TextInput';
+import Button from '../../components/base/Button';
+import { userData } from '../../redux/reducers/userDataSlice';
+import axios from 'axios';
+import Lottie from 'lottie-react-native';
+import Header from '../../components/common/Header';
 
 const arabic = 'ar';
 const english = 'en';
 const spanish = 'es';
 
-const Home = () => {
-  const [text, setText] = useState<string>('');
-  const theme = useTheme();
-  const { t, i18n } = useTranslation();
-  const lang = i18n?.language;
+interface User {
+  id:number,
+  name:string,
+  admin?:boolean
+}
 
-  const changeLanguage = async (newLang: string) => {
-    try {
-      const langsRTL = [arabic];
-      await i18n.changeLanguage(newLang);
-      setTimeout(() => {
-        if (langsRTL.includes(newLang) && !I18nManager.isRTL) {
-          I18nManager.forceRTL(true);
-          RNRestart.Restart();
-        } else if (I18nManager.isRTL) {
-          I18nManager.forceRTL(false);
-          RNRestart.Restart();
-        }
-      }, 1000);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (e: any) {
-      devLog.error(e);
-      showMessage({
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-        message: e?.message || 'Language Change Failed',
-        type: 'danger',
-      });
+const Home = () => {
+  const [input, setInput] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const usersData = useSelector((state: object) => state?.userProfileSlice?.userData)
+  const dispatch = useDispatch()
+
+  const userNameId = async () => {
+    if (!input) {
+      setError('Please Enter Name')
+      return true
     }
+
+    try {
+      setLoading(true)
+      const res = await axios.get(`https://api.mojang.com/users/profiles/minecraft/${input}`)
+      const person = res?.data;
+      const personExists: [] = usersData.some(
+        (item: object) => item.id === person.id && item.name === person.name
+      );
+
+      if (personExists) {
+        setError('User already exists! Please try another username.');
+      } else {
+        setError('')
+        dispatch(userData([...usersData, res?.data]))
+      }
+      setLoading(false)
+    } catch (err) {
+      setLoading(false)
+      console.log(err)
+      setError("Couldn't find any profile with that name")
+    }
+  }
+
+  const handleInputChange = (text: string): void => {
+    setInput(text)
+  }
+
+  const delet = (id: number) => {
+    const newData = usersData.filter((obj: object): void => obj.id !== id);
+    dispatch(userData(newData))
+  }
+
+  const handleAdminUser = (dt: object, i: number): void => {
+    const updatedData = usersData.map((obj: object, index: number): User => {
+      if (index === i) {
+        return { ...obj, admin: !obj.admin , };
+      }
+      return obj;
+    });
+    dispatch(userData(updatedData))
+
   };
 
-  const toggleSpanish = () =>
-    changeLanguage(lang === spanish ? english : spanish);
-  const toggleArabic = () => changeLanguage(lang === arabic ? english : arabic);
+  const submit = (): void => {
+    userNameId()
+  }
 
-  return (
-    <Container>
-      <Text style={styles.title}>Home {'\n\n'}</Text>
-      <Text>IconButton:{'\n'}</Text>
-      <View style={styles.row}>
-        <Text fontSize={17}> {t('round')}: </Text>
-        <IconButton round size={30} noBg={false} name="account" />
-        <Text fontSize={17}> {t('square')}: </Text>
-        <IconButton size={30} noBg={false} name="account" />
-        <Divider />
+  const card = (item: object, i: number) => {
+    const a = item?.item
+
+    return (
+      <View style={{ ...styles.card, borderBottomColor: a?.admin ? '#67A63D' : '', borderBottomWidth: a?.admin ? 3 : 0, }}>
+        <View style={styles.cardSection1}>
+          <Image source={{ uri: `https://minotar.net/avatar/${a?.id}` }} style={styles.avatar} />
+          <Text style={{ color: 'black', }}>{a?.name}</Text>
+        </View>
+        <View style={styles.cardSection2}>
+          <TouchableOpacity onPress={() => {
+            handleAdminUser(usersData[i], item?.index)
+          }}
+            style={{ width: '42%', height: '42%', marginLeft: 5, borderRadius: 50, overflow: 'hidden', }}
+          >{a?.admin ?
+            <Image source={{ uri: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRZ_tSzPCLOgliKEqXKsy21pY3ghCQYAsOGrQ&usqp=CAU' }} style={{ width: '100%', height: '100%', borderRadius: 50, resizeMode: 'contain', }} /> :
+            <Image source={{ uri: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAOEAAADhCAMAAAAJbSJIAAAAflBMVEX///8AAAD6+vr19fXn5+fW1tbPz8+wsLDCwsLw8PBBQUG6urrq6uqDg4PMzMzg4OCioqKMjIzGxsaoqKhXV1cnJycaGhqbm5szMzNGRkaxsbFpaWmTk5NQUFDZ2dlsbGwNDQ07OzsyMjJ5eXkYGBhgYGB9fX0jIyNMTEx0dHTvHCcmAAAIGklEQVR4nO2d2XbiMAxAS8JeKGuhLA2klHb4/x+coRzLdgiQRbI0PbqvLcImtqzVeXpSFEVRFEVRFEVRFEVRFEVRFEVRfhvRoPvcGS+Xy3HnuTuIuIeDy2A63KUNn3Qz7A64B4ZDe/KncYvV8IV7eHUZTT5vTu/CfphwD7I6USe7NPP5mMXcQ61EPH4tNL8zn8se93DLs10Unt/PYp1wD7gkL4+2Xw5d7kGXYLDJn8MiTd/f39O37/w/H5vcAy/KOm/0k07S7EXngz6Kes1kPTnm/NeMe+jF+MqO+3X5kmfCRO3lW/Zfd8FHW57Rhz/m7+Ho3n9PMgp3If50fPEH3H9++IluxuQRrnCevcGmxUY7XXmf6hCPsRYdb6jrwp/zf5gl4QhrMnbHeSpjikVD96NiT3/3lNhPS3647dpAQk+NqathytuZ8bvz+ccKioGWM8BhJQlLR0LZJRCA2BneuKIMd5nLs+DmVXRolq6zzhHHhoKzwursIWcvC1OobSw96JyMsowba4zWPa5nIGkhKbZh1+imtqxDTY1MQg8G9YEgLQVp97ySsFhnFsP3aYK0FYI0FKzHhGNt2WNRirKBR/iGJBDstz9IAmtizTWsfWPXqQzjDR7hAU3k1oh8RxNZA/uD46WS4r2R2UKTWR34vTGPLxD6hSi0KvAIMb2BHjxERKEVAYv0hCp2YsTy+8InM5Q2qtiREXtEFVuByER0P5EFm3D4njvvlpjfeossGHwM7jw4BBCxow4QFeH2hE0ebYEuuS/j0IejGf/cAm3KuxHBoKkefboFeCy8Zg0Ex/CLf8Ct5s3UmPAFQUwlSom0dDlMQoVCHRifpX7opw7GV6XITpts+SuB7OKYqgqKQwvOfALZxTGDoEiHdUXNkMIDaIuaIUU8BWbIGvs2g8B1nS5AhIsz0Rb/+hnCM6RwcWCVshqmQTSNiH34e08L4zxR2I4dETM0NWm4gbYLxub9JpBdHBNpmxPI3hDKLo6JTb8SeE8mjMGbCoZUH6EHXLU6BwcI3OIfF3BYUFgTxQGjBn8pQXKGOSRsSqEwShR8jHOdMre5QcwPeyNGRjB3fg12C7Y+gOIo7mqFnil8xY6mQO03e5EitMfgBm4h1MyfyQf7GFebgiYVULlvhoKq1eMFhdSKQKUdZkQRIonsKeAnx6xB9FQhs8yeH/3hD/5DhEeIb0hUwZb1Yil2WxUvQM+cMW4OmmaHE+hNyMUEtsIex8OYSnuEzkPcY6zTGJpoebNOLladYnRJ2M4NEYr0Amb1ua2Kl3AWGmy1ZO2t4zRciLoYBK0RxOmyFaNmLjgN3HV2T2LF8Kbvr4mcFu7qyUSnw+9TUsfMD7YYuvqx6PZoSih/zuB01lVM1Ljth/g1Vgi4fc6bCubWwfk8b5XQTbbOED/K9geN+s6n8foakDk1Kj8Gr9Fd0lGfweuq3xcPx7e82zFEX//htmP/243FFGKy8z4lqO0wj8zdNMfHc0wy1/XwppoK0PbH20jvXuQVdfqZ/5fRy3WX3tUFdMdO/iWCg/XVbUt99gh3IZbZcf97kodZa2QfZjxKZl/Zp9cQewxe00qvB/+P7/5qPj/N56t+/k1ur7y50HLMcqdwH8HX0uTRu7oP6wGn/2MHuvQmj6cFHP6/+T31Zrcv9bymPxYVsnhMvM5RlA94mwlIMxVkNHw8n1wO4i9r+2Gad11gUebcWfvHtNMa8zvzKnuOrfdb414dt93udNpKkqQ1nXa7283q1gWufUGh7gzN3Es9F5uxa7BZzqbbLveiz7mcS008cszRxm6WOzlL3Jydcj4n0UBNrm7qbByLbqnu9cP/FhdNvDJg5p0yx1u8nmcFfAnJjl5orjLDO5U/2UbZ1fomaDc+Z8Y2rGaCXVmyUnIz0cEf16TG8tr6oo4iVmrsr9BdPS9h4K/VVIBB3vROtLT+ad32jPY9u6nqh9ZwIoF+gIDZivN0DJrya3qPkVXfeBMcIqqFiZApehPEDeW2RUzRneAHtoMe9/mn6Oak5wQHl5uvYblLyU3c02Q03c3IYIjHzjlIFct1LkDfBz/6I2eb0N2+7eTqCLrj7rOjf4JnnMM/cBuis35o73Eah/klr7DlluQ5aSc2ElDbRDZiQV9VYMPLi3BBcZtX6gdw4GyEMlgxn2NRhdDhzn32ofwM+y6nMElbpyQzjM9vIw2htJvV3EHKwaweDdc4Z+OpIVaNDWyGi/bZK9EDvDLBehQhi5es+UbvZawC/poOsHLIu0xsJXDYiPQAvpf6LTvgM4WuILTWG+332MBF6LIC2zdLu/9hF4ZP8IEjRboTbT8EQ0IBHiKl7QZ+L8dLtWCHEFoaNvhE9x13AC1Hl8sAfcZzPzN8Pd1lIFAfwlNn1yNfQuDFcPVDQCqWqhh8Qv0FjwBVThU7Meqa7xoACNLSHFYQvOC7Bx5iizRHIqgyvoJz8L5pfH2IeZFIL4YJEaUUwuHFKJytcxAjovDdoMuas28HtClFzhTOCtYqHrOQKC7bNHEE3jeFmagbwa0nkTkNedsDYSPipxPBKOTtsiZ86wVEEXlrIiEiha9qjDkRMMWVB7z1At+wMnY97523VtXgKzzTxcTdaG0Spthv0LKOBXenNRjf6JKNYO4Xu0PQHf1AlGCznQEfDlung9/C3aubUP3UZD9dWcDywE6zGcH471cri7nMCN2o2VEdtGWZUZ2Hl6YD7vP+zM9v/UFR57LeDGV0P04nm5mIVhNFURRFURRFURRFURRFURRFURTF4y8zN0uL/luhkQAAAABJRU5ErkJggg==' }} style={{ width: '100%', height: '100%', borderRadius: 50, resizeMode: 'cover', }} />
+            }
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => {
+            delet(a?.id)
+          }}
+            style={{ width: '40%', height: '40%', marginLeft: 5, }}
+          >
+            <Image source={{ uri: 'https://i.pinimg.com/474x/c7/c1/bd/c7c1bd17a0e462b5cd6f46815f37abcd.jpg' }} style={{ width: '100%', height: '100%', marginHorizontal: 10, borderRadius: 50, resizeMode: 'contain', }}
+            />
+          </TouchableOpacity>
+        </View>
       </View>
+    )
+  }
+  return (
+    <SafeAreaView style={styles.main}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Image source={{ uri: 'https://e7.pngegg.com/pngimages/463/288/png-clipart-minecraft-video-game-mod-emoji-minecraft-grass-video-game-thumbnail.png' }} style={styles.logo} />
+        <Text style={styles.appName}>Minecraft Room Maker</Text>
+      </View>
+      {/*  */}
 
-      <TextInput value={text} onChangeText={setText} />
-      <Button
-        onPress={toggleSpanish}
-        title={t('changeLangBtn', {
-          lang: lang === spanish ? 'English' : 'Spanish ',
-        })}
-      />
-      <Button
-        onPress={toggleArabic}
-        title={t('changeLangBtn', {
-          lang: lang === arabic ? 'English' : 'Arabic ',
-        })}
-      />
+      {/* Section 1 */}
+      <View style={styles.inputContainer}>
+        <View style={styles.input}>
+          <TextInput label='Type user name to add in to room' value={input} onChangeText={handleInputChange} />
+        </View>
+        <Button title={'Add'} style={styles.AddBtn} onPress={submit} loading={loading} disabled={loading} />
+      </View>
+      {error ? <Text style={styles.error}>{error}</Text> : ''}
 
-      <Text>{`\n\n${t('greetings.helloUser', { name: 'KASHAN ' })}`}</Text>
-      <Text>{t('welcome')}</Text>
-      {lang && (
-        <Text>
-          Language: {i18n?.language} {'\n\n'}
-        </Text>
-      )}
-      <Text style={styles.env}>
-        Environment:{' '}
-        <Text style={{ color: theme?.colors?.primary }}>
-          {ENVIRONMENTS?.ENV}
-        </Text>
-      </Text>
-      <Text>
-        {'\n\n'}
-        Others Environment Variables:{' '}
-        <Text style={{ color: theme?.colors?.primary }}>
-          {JSON.stringify(ENVIRONMENTS)}
-        </Text>
-      </Text>
-    </Container>
+      {/*  */}
+
+      {/* Section 2 */}
+      <View style={styles.userInfoContainer}>
+        <Text style={{color:'black', marginVertical:5,}}>Chose admin for you room</Text>
+        {usersData?.length ?
+          <FlatList 
+          data={usersData}
+          renderItem={card} 
+          nestedScrollEnabled={true}
+          keyExtractor={(item, index) => index.toString()}
+          showsVerticalScrollIndicator={false} 
+           />
+          : ''}
+      </View>
+      {/*  */}
+    </SafeAreaView>
   );
 };
 
